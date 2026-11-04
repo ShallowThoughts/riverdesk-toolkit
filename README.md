@@ -18,3 +18,7 @@ UpdateForm.cs 中的 VersionInfo.Number 是版本来源。发布时创建 v主�
 发布签名私钥由发布账户保存，生成更新清单时通过 -Sign 使用。换电脑或换账户前需要先安排密钥迁移。生成新密钥会让旧安装拒绝更新。
 
 导航图标使用 Windows 自带的 [Segoe Fluent Icons](https://learn.microsoft.com/windows/apps/design/iconography/segoe-fluent-icons-font)，兼容 Segoe MDL2 Assets。
+
+## 许可证
+
+本项目源码采用 GNU General Public License v3.0（GPL-3.0-only）。完整条款见 [LICENSE](LICENSE)。
