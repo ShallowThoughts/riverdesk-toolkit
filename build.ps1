@@ -43,12 +43,14 @@ try {
     $version = [regex]::Match($source, 'Number = "(\d+\.\d+\.\d+)\.0"').Groups[1].Value
     if (-not $version) { throw 'Application version not found.' }
     $app = Join-Path $dist 'RiverDeskToolkit.exe'
+    $icon = Join-Path $dist 'RiverDeskToolkit.ico'
+    & (Join-Path $PSScriptRoot 'make-icon.ps1') -OutputPath $icon
     $csc = Join-Path $env:WINDIR 'Microsoft.NET\Framework64\v4.0.30319\csc.exe'
     if (-not (Test-Path -LiteralPath $csc)) { $csc = Join-Path $env:WINDIR 'Microsoft.NET\Framework\v4.0.30319\csc.exe' }
     $sources = 'DeepCleanC-v1.2.0.cs', 'AppShell.cs', 'ForceDeleteFeature.cs', 'UninstallerFeature.cs', 'UpdateForm.cs' |
         ForEach-Object { Join-Path $PSScriptRoot $_ }
     $arguments = '/nologo', '/warn:4', '/target:winexe', '/optimize+', '/platform:anycpu', '/r:System.ServiceProcess.dll',
-        "/resource:$publicKeyPath,RiverDesk.UpdatePublicKey", "/out:$app"
+        "/resource:$publicKeyPath,RiverDesk.UpdatePublicKey", "/win32icon:$icon", "/out:$app"
     & $csc @arguments @sources
     if ($LASTEXITCODE -ne 0) { throw 'Application compilation failed.' }
 

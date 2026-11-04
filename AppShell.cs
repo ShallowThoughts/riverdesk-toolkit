@@ -91,6 +91,8 @@ namespace DeepCleanC
         private readonly Panel content = new Panel();
         private readonly Dictionary<AppPage, Form> pages = new Dictionary<AppPage, Form>();
         private readonly Dictionary<AppPage, NavButton> navButtons = new Dictionary<AppPage, NavButton>();
+        private Icon brandIcon;
+        private Bitmap brandImage;
 
         internal AppShellForm(AppPage page, bool smoke, string[] paths)
         {
@@ -105,6 +107,12 @@ namespace DeepCleanC
         private void BuildUi()
         {
             Text = RiverDesk.VersionInfo.Name;
+            brandIcon = Icon.ExtractAssociatedIcon(Application.ExecutablePath);
+            if (brandIcon != null)
+            {
+                Icon = brandIcon;
+                brandImage = brandIcon.ToBitmap();
+            }
             StartPosition = FormStartPosition.CenterScreen;
             ClientSize = new Size(1160, 760);
             MinimumSize = new Size(1040, 680);
@@ -115,28 +123,13 @@ namespace DeepCleanC
             var sidebar = new Panel { Dock = DockStyle.Left, Width = 210, BackColor = FeatureTheme.Navigation };
             Controls.Add(sidebar);
 
-            var brandMark = new Panel
+            var brandMark = new PictureBox
             {
                 Location = new Point(22, 25),
                 Size = new Size(34, 34),
-                BackColor = Color.Transparent
-            };
-            brandMark.Paint += (sender, args) =>
-            {
-                args.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
-                using (var path = LiquidPaint.Rounded(new Rectangle(0, 0, 33, 33), 11))
-                using (var brush = new SolidBrush(FeatureTheme.Sky))
-                {
-                    args.Graphics.FillPath(brush, path);
-                    using (var pen = new Pen(Color.FromArgb(180, 255, 255, 255), 1F))
-                    {
-                        args.Graphics.DrawPath(pen, path);
-                        pen.Width = 1.8F;
-                        args.Graphics.DrawLine(pen, 8, 22, 15, 15);
-                        args.Graphics.DrawLine(pen, 15, 15, 20, 20);
-                        args.Graphics.DrawLine(pen, 20, 20, 26, 11);
-                    }
-                }
+                BackColor = Color.Transparent,
+                Image = brandImage,
+                SizeMode = PictureBoxSizeMode.CenterImage
             };
             sidebar.Controls.Add(brandMark);
 
@@ -280,6 +273,11 @@ namespace DeepCleanC
             if (disposing)
                 foreach (Form page in pages.Values) page.Dispose();
             base.Dispose(disposing);
+            if (disposing)
+            {
+                if (brandImage != null) brandImage.Dispose();
+                if (brandIcon != null) brandIcon.Dispose();
+            }
         }
     }
 }

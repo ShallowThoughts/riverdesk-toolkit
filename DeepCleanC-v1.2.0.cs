@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Drawing;
-using System.Drawing.Drawing2D;
 using System.IO;
 using System.Linq;
 using System.Reflection;
@@ -473,22 +472,6 @@ namespace DeepCleanC
                 catch { }
             }
         }
-    }
-
-    internal static class LiquidPaint
-    {
-        internal static GraphicsPath Rounded(Rectangle rectangle, int radius)
-        {
-            int diameter = Math.Min(radius * 2, Math.Min(rectangle.Width, rectangle.Height));
-            var path = new GraphicsPath();
-            path.AddArc(rectangle.Left, rectangle.Top, diameter, diameter, 180, 90);
-            path.AddArc(rectangle.Right - diameter, rectangle.Top, diameter, diameter, 270, 90);
-            path.AddArc(rectangle.Right - diameter, rectangle.Bottom - diameter, diameter, diameter, 0, 90);
-            path.AddArc(rectangle.Left, rectangle.Bottom - diameter, diameter, diameter, 90, 90);
-            path.CloseFigure();
-            return path;
-        }
-
     }
 
     internal sealed class LiquidButton : Button

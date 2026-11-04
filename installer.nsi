@@ -15,6 +15,8 @@ VIAddVersionKey /LANG=2052 "FileVersion" "${VERSION}"
 VIAddVersionKey /LANG=2052 "LegalCopyright" "RiverXILee"
 
 !define MUI_ABORTWARNING
+!define MUI_ICON "dist\RiverDeskToolkit.ico"
+!define MUI_UNICON "dist\RiverDeskToolkit.ico"
 !define MUI_FINISHPAGE_RUN "$INSTDIR\RiverDeskToolkit.exe"
 !define MUI_FINISHPAGE_RUN_NOTCHECKED
 !insertmacro MUI_PAGE_WELCOME
@@ -41,11 +43,11 @@ Section
     File "dist\RiverDeskToolkit.exe"
     WriteUninstaller "$INSTDIR\Uninstall.exe"
     CreateDirectory "$SMPROGRAMS\RiverDesk Toolkit"
-    CreateShortcut "$SMPROGRAMS\RiverDesk Toolkit\RiverDesk Toolkit.lnk" "$INSTDIR\RiverDeskToolkit.exe"
+    CreateShortcut "$SMPROGRAMS\RiverDesk Toolkit\RiverDesk Toolkit.lnk" "$INSTDIR\RiverDeskToolkit.exe" "" "$INSTDIR\RiverDeskToolkit.exe" 0
     WriteRegStr HKLM "${UNINSTALL_KEY}" "DisplayName" "RiverDesk Toolkit"
     WriteRegStr HKLM "${UNINSTALL_KEY}" "DisplayVersion" "${VERSION}"
     WriteRegStr HKLM "${UNINSTALL_KEY}" "Publisher" "RiverXILee"
-    WriteRegStr HKLM "${UNINSTALL_KEY}" "DisplayIcon" "$INSTDIR\RiverDeskToolkit.exe"
+    WriteRegStr HKLM "${UNINSTALL_KEY}" "DisplayIcon" '"$INSTDIR\RiverDeskToolkit.exe",0'
     WriteRegStr HKLM "${UNINSTALL_KEY}" "InstallLocation" "$INSTDIR"
     WriteRegStr HKLM "${UNINSTALL_KEY}" "UninstallString" '"$INSTDIR\Uninstall.exe"'
     WriteRegDWORD HKLM "${UNINSTALL_KEY}" "NoModify" 1
