@@ -60,6 +60,7 @@ namespace DeepCleanC
                 using (var ink = new SolidBrush(color))
                 using (var format = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center })
                 {
+                    graphics.Clear(Color.Transparent);
                     graphics.SmoothingMode = SmoothingMode.AntiAlias;
                     graphics.TextRenderingHint = TextRenderingHint.AntiAliasGridFit;
                     graphics.DrawString(glyph, fluent.Name == "Segoe Fluent Icons" ? fluent : legacy, ink,

@@ -555,7 +555,8 @@ namespace DeepCleanC
 
         protected override void OnPaintBackground(PaintEventArgs e)
         {
-            e.Graphics.Clear(Parent == null ? FeatureTheme.Background : Parent.BackColor);
+            using (var background = new SolidBrush(Parent == null ? FeatureTheme.Background : Parent.BackColor))
+                e.Graphics.FillRectangle(background, e.ClipRectangle);
         }
 
         protected override void OnPaint(PaintEventArgs e)
@@ -584,7 +585,8 @@ namespace DeepCleanC
             }
 
             var textArea = Rectangle.Inflate(ClientRectangle, -(int)(8 * scale), -2);
-            TextFormatFlags flags = TextFormatFlags.VerticalCenter | TextFormatFlags.SingleLine | TextFormatFlags.EndEllipsis;
+            TextFormatFlags flags = TextFormatFlags.VerticalCenter | TextFormatFlags.SingleLine | TextFormatFlags.EndEllipsis
+                | TextFormatFlags.PreserveGraphicsClipping | TextFormatFlags.PreserveGraphicsTranslateTransform;
             if (Image != null)
             {
                 int imageWidth = (int)(Image.Width * scale);
@@ -599,7 +601,8 @@ namespace DeepCleanC
             else if (!ShowKeyboardCues) flags |= TextFormatFlags.HidePrefix;
             TextRenderer.DrawText(e.Graphics, Text, Font, textArea, ink, flags);
             if (Focused && ShowFocusCues)
-                ControlPaint.DrawFocusRectangle(e.Graphics, Rectangle.Inflate(ClientRectangle, -4, -4), ink, fill);
+                using (var focus = new Pen(ink) { DashStyle = DashStyle.Dot })
+                    e.Graphics.DrawRectangle(focus, Rectangle.Inflate(ClientRectangle, -4, -4));
         }
 
         private void ApplyColors()
@@ -624,7 +627,7 @@ namespace DeepCleanC
         private readonly LiquidButton cleanButton = new LiquidButton();
         private readonly ProgressBar progress = new ProgressBar();
         private readonly Label summary = new Label();
-        private readonly TextBox log = new TextBox();
+        private readonly LogView log = new LogView();
         private readonly BackgroundWorker worker = new BackgroundWorker();
         private readonly bool smokeTest;
         private bool busy;
@@ -748,9 +751,6 @@ namespace DeepCleanC
                 HighlightFocus = true
             };
             log.Dock = DockStyle.Fill;
-            log.Multiline = true;
-            log.ReadOnly = true;
-            log.ScrollBars = ScrollBars.Vertical;
             log.BorderStyle = BorderStyle.None;
             log.BackColor = FeatureTheme.Surface;
             log.ForeColor = FeatureTheme.Text;

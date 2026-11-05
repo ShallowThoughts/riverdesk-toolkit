@@ -126,7 +126,8 @@ namespace DeepCleanC
 
         protected override void OnPaintBackground(PaintEventArgs e)
         {
-            e.Graphics.Clear(Parent == null ? FeatureTheme.Background : Parent.BackColor);
+            using (var background = new SolidBrush(Parent == null ? FeatureTheme.Background : Parent.BackColor))
+                e.Graphics.FillRectangle(background, e.ClipRectangle);
             if (Width < 2 || Height < 2) return;
             Color border = HighlightFocus && ContainsFocus ? FeatureTheme.Sky : FeatureTheme.Grid;
             Color fill = BackColor;
@@ -151,6 +152,48 @@ namespace DeepCleanC
         internal FeatureGrid()
         {
             DoubleBuffered = true;
+        }
+    }
+
+    internal sealed class LogView : Panel
+    {
+        private readonly Label content = new Label
+        {
+            AutoSize = true, UseMnemonic = false, TabStop = false,
+            Location = Point.Empty, BackColor = Color.Transparent
+        };
+
+        internal LogView()
+        {
+            AutoScroll = true;
+            TabStop = false;
+            Cursor = Cursors.Default;
+            AccessibleName = "清理记录";
+            Controls.Add(content);
+        }
+
+        protected override void OnTextChanged(EventArgs e)
+        {
+            base.OnTextChanged(e);
+            content.Text = Text;
+        }
+
+        protected override void OnClientSizeChanged(EventArgs e)
+        {
+            base.OnClientSizeChanged(e);
+            content.MaximumSize = new Size(Math.Max(1, ClientSize.Width - 1), 0);
+        }
+
+        internal void AppendText(string value)
+        {
+            Text += value;
+            AutoScrollPosition = new Point(0, content.Height);
+        }
+
+        internal void Clear()
+        {
+            Text = String.Empty;
+            AutoScrollPosition = Point.Empty;
         }
     }
 
