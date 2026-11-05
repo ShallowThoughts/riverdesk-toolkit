@@ -28,19 +28,34 @@ namespace DeepCleanC
 
     internal static class FeatureTheme
     {
-        internal static readonly Color Background = Color.FromArgb(249, 250, 252);
-        internal static readonly Color Navigation = Color.FromArgb(238, 242, 248);
+        internal static readonly Color Background = Color.White;
+        internal static readonly Color Navigation = Color.FromArgb(244, 247, 251);
         internal static readonly Color Surface = Color.White;
-        internal static readonly Color SurfaceAlt = Color.FromArgb(249, 251, 254);
-        internal static readonly Color Header = Color.FromArgb(237, 242, 248);
-        internal static readonly Color Text = Color.FromArgb(37, 50, 74);
-        internal static readonly Color Muted = Color.FromArgb(101, 117, 142);
+        internal static readonly Color SurfaceAlt = Color.FromArgb(248, 250, 253);
+        internal static readonly Color Header = Color.FromArgb(240, 244, 249);
+        internal static readonly Color Hover = Color.FromArgb(231, 238, 248);
+        internal static readonly Color Selected = Color.FromArgb(218, 234, 251);
+        internal static readonly Color Text = Color.FromArgb(27, 42, 64);
+        internal static readonly Color Muted = Color.FromArgb(76, 94, 119);
         internal static readonly Color Success = Color.FromArgb(24, 116, 84);
         internal static readonly Color Warning = Color.FromArgb(143, 88, 17);
         internal static readonly Color Danger = Color.FromArgb(184, 53, 73);
-        internal static readonly Color Grid = Color.FromArgb(221, 228, 238);
+        internal static readonly Color Grid = Color.FromArgb(226, 233, 242);
+        internal static readonly Color ControlBorder = Color.FromArgb(133, 150, 173);
         internal static readonly Color Indigo = Color.FromArgb(87, 78, 185);
-        internal static readonly Color Sky = Color.FromArgb(39, 109, 164);
+        internal static readonly Color Sky = Color.FromArgb(33, 100, 157);
+
+        internal static GraphicsPath RoundedRectangle(RectangleF bounds, float radius)
+        {
+            float diameter = Math.Min(radius * 2F, Math.Min(bounds.Width, bounds.Height));
+            var path = new GraphicsPath();
+            path.AddArc(bounds.Left, bounds.Top, diameter, diameter, 180, 90);
+            path.AddArc(bounds.Right - diameter, bounds.Top, diameter, diameter, 270, 90);
+            path.AddArc(bounds.Right - diameter, bounds.Bottom - diameter, diameter, diameter, 0, 90);
+            path.AddArc(bounds.Left, bounds.Bottom - diameter, diameter, diameter, 90, 90);
+            path.CloseFigure();
+            return path;
+        }
 
         internal static void PaintBackground(Control control, PaintEventArgs e)
         {
@@ -62,23 +77,80 @@ namespace DeepCleanC
             grid.ColumnHeadersBorderStyle = DataGridViewHeaderBorderStyle.None;
             grid.EnableHeadersVisualStyles = false;
             grid.ColumnHeadersHeight = 34;
+            grid.ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.DisableResizing;
             grid.ColumnHeadersDefaultCellStyle = new DataGridViewCellStyle
             {
                 BackColor = Header,
                 ForeColor = Text,
+                SelectionForeColor = Text,
                 SelectionBackColor = Header,
+                Padding = new Padding(8, 0, 8, 0),
                 Font = new Font("Microsoft YaHei UI", 9F, FontStyle.Bold)
             };
             grid.DefaultCellStyle = new DataGridViewCellStyle
             {
                 BackColor = Surface,
                 ForeColor = Text,
-                SelectionBackColor = Color.FromArgb(225, 233, 251),
+                SelectionBackColor = Selected,
                 SelectionForeColor = Text,
-                Padding = new Padding(5)
+                Padding = new Padding(8, 4, 8, 4)
             };
             grid.AlternatingRowsDefaultCellStyle = new DataGridViewCellStyle { BackColor = SurfaceAlt };
-            grid.RowTemplate.Height = 42;
+            grid.RowTemplate.Height = 36;
+        }
+    }
+
+    internal sealed class FeatureFrame : Panel
+    {
+        internal bool HighlightFocus { get; set; }
+
+        internal FeatureFrame()
+        {
+            DoubleBuffered = true;
+            SetStyle(ControlStyles.ResizeRedraw, true);
+            BackColor = FeatureTheme.Surface;
+            Padding = new Padding(10);
+        }
+
+        protected override void OnEnter(EventArgs e)
+        {
+            base.OnEnter(e);
+            if (HighlightFocus) Invalidate();
+        }
+
+        protected override void OnLeave(EventArgs e)
+        {
+            base.OnLeave(e);
+            if (HighlightFocus) Invalidate();
+        }
+
+        protected override void OnPaintBackground(PaintEventArgs e)
+        {
+            e.Graphics.Clear(Parent == null ? FeatureTheme.Background : Parent.BackColor);
+            if (Width < 2 || Height < 2) return;
+            Color border = HighlightFocus && ContainsFocus ? FeatureTheme.Sky : FeatureTheme.Grid;
+            Color fill = BackColor;
+            if (SystemInformation.HighContrast)
+            {
+                border = SystemColors.WindowText;
+                fill = SystemColors.Window;
+            }
+            using (var shape = FeatureTheme.RoundedRectangle(new RectangleF(0.5F, 0.5F, Width - 1F, Height - 1F), 8F * e.Graphics.DpiX / 96F))
+            using (var surface = new SolidBrush(fill))
+            using (var outline = new Pen(border))
+            {
+                e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
+                e.Graphics.FillPath(surface, shape);
+                e.Graphics.DrawPath(outline, shape);
+            }
+        }
+    }
+
+    internal sealed class FeatureGrid : DataGridView
+    {
+        internal FeatureGrid()
+        {
+            DoubleBuffered = true;
         }
     }
 
@@ -132,7 +204,8 @@ namespace DeepCleanC
             }
 
             string executable = Normalize(Application.ExecutablePath);
-            if (SameOrChild(executable, fullPath))
+            string library = Normalize(typeof(ToolkitApplication).Assembly.Location);
+            if (SameOrChild(executable, fullPath) || SameOrChild(library, fullPath))
                 throw new InvalidOperationException("拒绝删除当前工具或其所在目录");
 
             for (string parent = Path.GetDirectoryName(fullPath); !Same(parent, root); parent = Path.GetDirectoryName(parent))
@@ -169,7 +242,7 @@ namespace DeepCleanC
             {
                 string path = ForceDeleteSafety.Normalize(target.FullPath);
                 ForceDeleteSafety.AssertAllowed(path);
-                DeleteEntry(path, Program.IsAdministrator());
+                DeleteEntry(path, ToolkitApplication.IsAdministrator());
                 try
                 {
                     File.GetAttributes(path);
@@ -295,7 +368,9 @@ namespace DeepCleanC
                 if (junctionCreated && !File.Exists(sentinel)) return false;
 
                 return !ForceDeleteSafety.IsAllowed(Path.GetPathRoot(root))
-                    && !ForceDeleteSafety.IsAllowed(Environment.GetFolderPath(Environment.SpecialFolder.Windows));
+                    && !ForceDeleteSafety.IsAllowed(Environment.GetFolderPath(Environment.SpecialFolder.Windows))
+                    && !ForceDeleteSafety.IsAllowed(Application.ExecutablePath)
+                    && !ForceDeleteSafety.IsAllowed(typeof(ToolkitApplication).Assembly.Location);
             }
             catch { return false; }
             finally
@@ -335,7 +410,7 @@ namespace DeepCleanC
         private readonly HashSet<string> paths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         private readonly string[] initialPaths;
         private readonly bool smokeTest;
-        private readonly DataGridView grid = new DataGridView();
+        private readonly DataGridView grid = new FeatureGrid();
         private readonly Label status = new Label();
         private readonly Label count = new Label();
         private readonly LiquidButton addFiles = new LiquidButton();
@@ -403,11 +478,11 @@ namespace DeepCleanC
 
             var admin = new Label
             {
-                Text = Program.IsAdministrator() ? "● 管理员权限" : "● 缺少管理员权限",
+                Text = ToolkitApplication.IsAdministrator() ? "● 管理员权限" : "● 缺少管理员权限",
                 AutoSize = true,
                 Location = new Point(700, 14),
                 Anchor = AnchorStyles.Top | AnchorStyles.Right,
-                ForeColor = Program.IsAdministrator() ? FeatureTheme.Success : FeatureTheme.Warning,
+                ForeColor = ToolkitApplication.IsAdministrator() ? FeatureTheme.Success : FeatureTheme.Warning,
                 BackColor = Color.Transparent
             };
             header.Controls.Add(admin);
@@ -594,7 +669,7 @@ namespace DeepCleanC
 
         private void DeleteClicked(object sender, EventArgs e)
         {
-            if (!Program.IsAdministrator())
+            if (!ToolkitApplication.IsAdministrator())
             {
                 MessageBox.Show(this, "请关闭软件后重新以管理员身份运行。", "需要管理员权限", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;

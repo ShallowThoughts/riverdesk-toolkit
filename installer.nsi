@@ -28,6 +28,28 @@ VIAddVersionKey /LANG=2052 "LegalCopyright" "RiverXILee"
 
 !define UNINSTALL_KEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\RiverDeskToolkit"
 
+!macro CheckApplicationClosed PREFIX
+Function ${PREFIX}CheckApplicationClosed
+    retry:
+    IfFileExists "$INSTDIR\RiverDeskToolkit.exe" 0 checkLibrary
+    System::Call 'kernel32::CreateFileW(w "$INSTDIR\RiverDeskToolkit.exe", i 0x40000000, i 0, p 0, i 3, i 0, p 0) p.r0'
+    IntCmp $0 -1 blocked
+    System::Call 'kernel32::CloseHandle(p r0)'
+    checkLibrary:
+    IfFileExists "$INSTDIR\RiverDesk.Toolkit.dll" 0 done
+    System::Call 'kernel32::CreateFileW(w "$INSTDIR\RiverDesk.Toolkit.dll", i 0x40000000, i 0, p 0, i 3, i 0, p 0) p.r0'
+    IntCmp $0 -1 blocked
+    System::Call 'kernel32::CloseHandle(p r0)'
+    Goto done
+    blocked:
+    MessageBox MB_RETRYCANCEL|MB_ICONEXCLAMATION "暂时无法更新程序文件。请关闭 RiverDesk Toolkit 后重试。" IDRETRY retry
+    Abort
+    done:
+FunctionEnd
+!macroend
+!insertmacro CheckApplicationClosed ""
+!insertmacro CheckApplicationClosed "un."
+
 Function .onInit
     ${If} ${RunningX64}
         SetRegView 64
@@ -39,8 +61,11 @@ Function .onInit
 FunctionEnd
 
 Section
+    Call CheckApplicationClosed
     SetOutPath "$INSTDIR"
+    File "dist\RiverDesk.Toolkit.dll"
     File "dist\RiverDeskToolkit.exe"
+    File /oname=LICENSE.txt "LICENSE"
     WriteUninstaller "$INSTDIR\Uninstall.exe"
     CreateDirectory "$SMPROGRAMS\RiverDesk Toolkit"
     CreateShortcut "$SMPROGRAMS\RiverDesk Toolkit\RiverDesk Toolkit.lnk" "$INSTDIR\RiverDeskToolkit.exe" "" "$INSTDIR\RiverDeskToolkit.exe" 0
@@ -62,7 +87,10 @@ Function un.onInit
 FunctionEnd
 
 Section "Uninstall"
+    Call un.CheckApplicationClosed
     Delete "$INSTDIR\RiverDeskToolkit.exe"
+    Delete "$INSTDIR\RiverDesk.Toolkit.dll"
+    Delete "$INSTDIR\LICENSE.txt"
     Delete "$INSTDIR\Uninstall.exe"
     Delete "$INSTDIR\Updates\RiverDeskToolkit-*.exe"
     RMDir "$INSTDIR\Updates"

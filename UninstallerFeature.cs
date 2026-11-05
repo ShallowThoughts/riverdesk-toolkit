@@ -461,7 +461,7 @@ namespace DeepCleanC
     {
         private readonly bool smokeTest;
         private readonly List<InstalledProgram> programs = new List<InstalledProgram>();
-        private readonly DataGridView grid = new DataGridView();
+        private readonly DataGridView grid = new FeatureGrid();
         private readonly TextBox search = new TextBox();
         private readonly Label status = new Label();
         private readonly LiquidButton refresh = new LiquidButton();
@@ -516,14 +516,21 @@ namespace DeepCleanC
                 BackColor = Color.Transparent
             });
 
-            search.Location = new Point(20, 100);
-            search.Size = new Size(400, 28);
-            search.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
+            var searchFrame = new FeatureFrame
+            {
+                Location = new Point(20, 96), Size = new Size(400, 36),
+                Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right,
+                Padding = new Padding(10, 7, 10, 7),
+                HighlightFocus = true
+            };
+            search.Dock = DockStyle.Fill;
             search.BackColor = FeatureTheme.Surface;
             search.ForeColor = FeatureTheme.Text;
-            search.BorderStyle = BorderStyle.FixedSingle;
+            search.BorderStyle = BorderStyle.None;
+            search.AccessibleName = "搜索软件名或发布者";
             search.TextChanged += (sender, args) => PopulateGrid();
-            Controls.Add(search);
+            searchFrame.Controls.Add(search);
+            Controls.Add(searchFrame);
 
             var searchHint = new Label
             {
@@ -545,10 +552,11 @@ namespace DeepCleanC
             grid.ReadOnly = true;
             grid.MultiSelect = false;
             FeatureTheme.StyleGrid(grid);
-            grid.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "软件", Width = 260 });
-            grid.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "发布者", Width = 190 });
-            grid.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "版本", Width = 110 });
-            grid.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "估算大小", Width = 100 });
+            grid.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "软件", Width = 250 });
+            grid.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "发布者", Width = 170 });
+            grid.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "版本", Width = 100 });
+            grid.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "估算大小", Width = 100,
+                DefaultCellStyle = new DataGridViewCellStyle { Alignment = DataGridViewContentAlignment.MiddleRight } });
             grid.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "安装位置", AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill });
             grid.SelectionChanged += (sender, args) => UpdateButtons();
             grid.CellDoubleClick += (sender, args) => { if (args.RowIndex >= 0) StartStandardUninstall(); };
@@ -602,8 +610,6 @@ namespace DeepCleanC
                 programs.Clear();
                 programs.AddRange((List<InstalledProgram>)args.Result);
                 PopulateGrid();
-                status.Text = "共找到 " + programs.Count + " 个传统桌面软件。双击可运行标准卸载。";
-                status.ForeColor = FeatureTheme.Muted;
 
                 if (smokeTest)
                     BeginInvoke(new Action(CaptureAndClose));
@@ -628,18 +634,35 @@ namespace DeepCleanC
         private void PopulateGrid()
         {
             string filter = search.Text.Trim();
-            grid.Rows.Clear();
             IEnumerable<InstalledProgram> visible = programs;
             if (!String.IsNullOrWhiteSpace(filter))
                 visible = visible.Where(program => Contains(program.DisplayName, filter) || Contains(program.Publisher, filter));
 
+            var rows = new List<DataGridViewRow>();
             foreach (InstalledProgram program in visible)
             {
-                int row = grid.Rows.Add(program.DisplayName, program.Publisher, program.DisplayVersion,
+                var row = (DataGridViewRow)grid.RowTemplate.Clone();
+                row.CreateCells(grid, program.DisplayName, program.Publisher, program.DisplayVersion,
                     program.EstimatedSizeKb > 0 ? FormatSize(program.EstimatedSizeKb * 1024L) : "—",
                     String.IsNullOrWhiteSpace(program.InstallLocation) ? "未登记" : program.InstallLocation);
-                grid.Rows[row].Tag = program;
+                row.Tag = program;
+                rows.Add(row);
             }
+            grid.SuspendLayout();
+            try
+            {
+                grid.Rows.Clear();
+                if (rows.Count > 0) grid.Rows.AddRange(rows.ToArray());
+                grid.ClearSelection();
+            }
+            finally { grid.ResumeLayout(); }
+
+            status.ForeColor = FeatureTheme.Muted;
+            if (filter.Length == 0)
+                status.Text = "共找到 " + programs.Count + " 个传统桌面软件。双击可运行标准卸载。";
+            else
+                status.Text = rows.Count == 0 ? "没有匹配的软件，请尝试其他关键词。"
+                    : "显示 " + rows.Count + " / " + programs.Count + " 个软件。";
             UpdateButtons();
         }
 
@@ -743,7 +766,7 @@ namespace DeepCleanC
     {
         private readonly InstalledProgram program;
         private readonly List<LeftoverItem> items = new List<LeftoverItem>();
-        private readonly DataGridView grid = new DataGridView();
+        private readonly DataGridView grid = new FeatureGrid();
         private readonly Label status = new Label();
         private readonly LiquidButton clear = new LiquidButton();
         private readonly LiquidButton remove = new LiquidButton();
@@ -801,6 +824,7 @@ namespace DeepCleanC
             FeatureTheme.StyleGrid(grid);
             grid.MultiSelect = false;
             grid.Columns.Add(new DataGridViewCheckBoxColumn { HeaderText = "删除", Width = 54 });
+            grid.Columns[0].HeaderCell.Style.Padding = new Padding(2, 0, 2, 0);
             grid.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "类型", Width = 150, ReadOnly = true });
             grid.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "位置", AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill, ReadOnly = true });
             grid.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "置信度", Width = 76, ReadOnly = true });

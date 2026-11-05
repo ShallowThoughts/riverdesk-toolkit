@@ -13,14 +13,6 @@ using DeepCleanC;
 
 namespace RiverDesk
 {
-    internal static class VersionInfo
-    {
-        internal const string Name = "RiverDesk Toolkit";
-        internal const string Number = "1.3.1.0";
-        internal const string Releases = "https://github.com/ShallowThoughts/riverdesk-toolkit/releases";
-        internal static readonly Version Current = new Version(Number);
-    }
-
     internal sealed class UpdateRelease
     {
         internal Version Version;
@@ -104,7 +96,7 @@ namespace RiverDesk
         private readonly TextBox notes = new TextBox
         {
             Dock = DockStyle.Fill, Multiline = true, ReadOnly = true, ScrollBars = ScrollBars.Vertical,
-            BackColor = FeatureTheme.Surface, ForeColor = FeatureTheme.Text, BorderStyle = BorderStyle.FixedSingle
+            BackColor = FeatureTheme.Surface, ForeColor = FeatureTheme.Text, BorderStyle = BorderStyle.None
         };
         private UpdateRelease available;
         internal bool IsBusy { get; private set; }
@@ -126,7 +118,8 @@ namespace RiverDesk
             install.AccentColor = FeatureTheme.Sky;
             actions.Controls.Add(check);
             actions.Controls.Add(install);
-            var releases = new LinkLabel { Text = "GitHub 发布记录", AutoSize = true, Margin = new Padding(12, 13, 0, 0) };
+            var releases = new LinkLabel { Text = "GitHub 发布记录", AutoSize = true, Margin = new Padding(12, 13, 0, 0),
+                LinkColor = FeatureTheme.Sky, ActiveLinkColor = FeatureTheme.Text, VisitedLinkColor = FeatureTheme.Sky };
             releases.LinkClicked += (sender, args) => Process.Start(new ProcessStartInfo(VersionInfo.Releases) { UseShellExecute = true });
             actions.Controls.Add(releases);
             layout.Controls.Add(actions, 0, 2);
@@ -136,7 +129,9 @@ namespace RiverDesk
             layout.Controls.Add(progress, 0, 4);
             layout.Controls.Add(new Label { Text = "更新说明", AutoSize = true, ForeColor = FeatureTheme.Text,
                 Margin = new Padding(4, 20, 0, 8) }, 0, 5);
-            layout.Controls.Add(notes, 0, 6);
+            var notesFrame = new FeatureFrame { Dock = DockStyle.Fill, Margin = new Padding(0), HighlightFocus = true };
+            notesFrame.Controls.Add(notes);
+            layout.Controls.Add(notesFrame, 0, 6);
             notes.Text = "检查后将在这里显示最新版本的说明。";
             Controls.Add(layout);
             check.Click += async (sender, args) => await CheckAsync();
@@ -155,6 +150,8 @@ namespace RiverDesk
             available = null;
             SetBusy(true);
             status.Text = "正在检查更新…";
+            progress.Style = ProgressBarStyle.Marquee;
+            progress.Visible = true;
             try
             {
                 UpdateRelease latest = await Task.Run(() => UpdateRelease.Check());
@@ -171,7 +168,11 @@ namespace RiverDesk
                 status.Text = "检查更新失败。请重试或查看 GitHub 发布记录。";
                 notes.Text = ex.Message;
             }
-            finally { SetBusy(false); }
+            finally
+            {
+                progress.Visible = false;
+                SetBusy(false);
+            }
         }
 
         private async Task InstallAsync()
@@ -179,6 +180,7 @@ namespace RiverDesk
             UpdateRelease release = available;
             if (release == null || !canClose()) return;
             SetBusy(true);
+            progress.Style = ProgressBarStyle.Continuous;
             progress.Value = 0;
             progress.Visible = true;
             string path = null;
@@ -186,7 +188,7 @@ namespace RiverDesk
             try
             {
                 string installedDirectory = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), VersionInfo.Name);
-                if (!Program.IsAdministrator() || !String.Equals(Application.StartupPath, installedDirectory, StringComparison.OrdinalIgnoreCase)
+                if (!ToolkitApplication.IsAdministrator() || !String.Equals(Application.StartupPath, installedDirectory, StringComparison.OrdinalIgnoreCase)
                     || !File.Exists(Path.Combine(installedDirectory, "Uninstall.exe")))
                     throw new InvalidOperationException("请从开始菜单以管理员权限打开已安装的 RiverDesk Toolkit。");
                 string directory = Path.Combine(installedDirectory, "Updates");

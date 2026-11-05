@@ -3,25 +3,17 @@ using System.Collections.Generic;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Drawing;
+using System.Drawing.Drawing2D;
 using System.IO;
 using System.Linq;
-using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Security.Principal;
 using System.ServiceProcess;
 using System.Windows.Forms;
 
-[assembly: AssemblyTitle("RiverDesk Toolkit")]
-[assembly: AssemblyDescription("C 盘清理、软件卸载与强制删除工具")]
-[assembly: AssemblyCompany("RiverXILee")]
-[assembly: AssemblyProduct("RiverDesk Toolkit")]
-[assembly: AssemblyCopyright("© 2026 RiverXILee")]
-[assembly: AssemblyVersion(RiverDesk.VersionInfo.Number)]
-[assembly: AssemblyFileVersion(RiverDesk.VersionInfo.Number)]
-
 namespace DeepCleanC
 {
-    internal static class Program
+    public static class ToolkitApplication
     {
         internal static bool IsAdministrator()
         {
@@ -31,8 +23,7 @@ namespace DeepCleanC
             }
         }
 
-        [STAThread]
-        private static void Main(string[] args)
+        public static void Run(string[] args)
         {
             if (args.Any(a => a.Equals("--self-test", StringComparison.OrdinalIgnoreCase)))
             {
@@ -332,7 +323,7 @@ namespace DeepCleanC
             var result = new CleanResult { Id = category.Id, Note = "" };
             result.Before = ScanBytes(category);
 
-            if (category.RequiresAdmin && !Program.IsAdministrator())
+            if (category.RequiresAdmin && !ToolkitApplication.IsAdministrator())
             {
                 result.After = result.Before;
                 result.Failures = 1;
@@ -474,9 +465,11 @@ namespace DeepCleanC
         }
     }
 
-    internal sealed class LiquidButton : Button
+    internal class LiquidButton : Button
     {
         private Color accentColor;
+        private bool hovered;
+        private bool pressed;
 
         internal Color AccentColor
         {
@@ -492,31 +485,139 @@ namespace DeepCleanC
             FlatStyle = FlatStyle.Flat;
             UseVisualStyleBackColor = false;
             Cursor = Cursors.Hand;
+            SetStyle(ControlStyles.OptimizedDoubleBuffer | ControlStyles.AllPaintingInWmPaint
+                | ControlStyles.ResizeRedraw, true);
             ApplyColors();
+        }
+
+        protected override void OnMouseEnter(EventArgs e)
+        {
+            base.OnMouseEnter(e);
+            hovered = true;
+            Invalidate();
+        }
+
+        protected override void OnMouseLeave(EventArgs e)
+        {
+            base.OnMouseLeave(e);
+            hovered = false;
+            Invalidate();
+        }
+
+        protected override void OnMouseDown(MouseEventArgs e)
+        {
+            base.OnMouseDown(e);
+            if (e.Button == MouseButtons.Left) pressed = true;
+            Invalidate();
+        }
+
+        protected override void OnMouseUp(MouseEventArgs e)
+        {
+            base.OnMouseUp(e);
+            pressed = false;
+            Invalidate();
+        }
+
+        protected override void OnKeyDown(KeyEventArgs e)
+        {
+            base.OnKeyDown(e);
+            if (e.KeyCode == Keys.Space) pressed = true;
+            Invalidate();
+        }
+
+        protected override void OnKeyUp(KeyEventArgs e)
+        {
+            base.OnKeyUp(e);
+            pressed = false;
+            Invalidate();
+        }
+
+        protected override void OnMouseCaptureChanged(EventArgs e)
+        {
+            base.OnMouseCaptureChanged(e);
+            if (!Capture) pressed = false;
+            Invalidate();
+        }
+
+        protected override void OnLostFocus(EventArgs e)
+        {
+            base.OnLostFocus(e);
+            pressed = false;
+            Invalidate();
         }
 
         protected override void OnEnabledChanged(EventArgs e)
         {
             base.OnEnabledChanged(e);
+            if (!Enabled) pressed = false;
             ApplyColors();
+        }
+
+        protected override void OnPaintBackground(PaintEventArgs e)
+        {
+            e.Graphics.Clear(Parent == null ? FeatureTheme.Background : Parent.BackColor);
+        }
+
+        protected override void OnPaint(PaintEventArgs e)
+        {
+            if (Width < 2 || Height < 2) return;
+            Color fill = BackColor;
+            if (Enabled && pressed) fill = FlatAppearance.MouseDownBackColor;
+            else if (Enabled && hovered) fill = FlatAppearance.MouseOverBackColor;
+            Color ink = ForeColor;
+            Color border = FlatAppearance.BorderColor;
+            if (SystemInformation.HighContrast)
+            {
+                fill = Enabled && (hovered || pressed) ? SystemColors.Highlight : SystemColors.Control;
+                ink = !Enabled ? SystemColors.GrayText
+                    : hovered || pressed ? SystemColors.HighlightText : SystemColors.ControlText;
+                border = SystemColors.ControlText;
+            }
+            float scale = e.Graphics.DpiX / 96F;
+            using (var shape = FeatureTheme.RoundedRectangle(new RectangleF(0.5F, 0.5F, Width - 1F, Height - 1F), 6F * scale))
+            using (var surface = new SolidBrush(fill))
+            using (var outline = new Pen(border))
+            {
+                e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
+                e.Graphics.FillPath(surface, shape);
+                if (FlatAppearance.BorderSize > 0) e.Graphics.DrawPath(outline, shape);
+            }
+
+            var textArea = Rectangle.Inflate(ClientRectangle, -(int)(8 * scale), -2);
+            TextFormatFlags flags = TextFormatFlags.VerticalCenter | TextFormatFlags.SingleLine | TextFormatFlags.EndEllipsis;
+            if (Image != null)
+            {
+                int imageWidth = (int)(Image.Width * scale);
+                int imageHeight = (int)(Image.Height * scale);
+                e.Graphics.DrawImage(Image, new Rectangle((int)(2 * scale), (Height - imageHeight) / 2, imageWidth, imageHeight));
+                textArea.X = (int)(48 * scale);
+                textArea.Width = Math.Max(0, Width - textArea.X - (int)(8 * scale));
+                flags |= TextFormatFlags.Left;
+            }
+            else flags |= TextFormatFlags.HorizontalCenter;
+            if (!UseMnemonic) flags |= TextFormatFlags.NoPrefix;
+            else if (!ShowKeyboardCues) flags |= TextFormatFlags.HidePrefix;
+            TextRenderer.DrawText(e.Graphics, Text, Font, textArea, ink, flags);
+            if (Focused && ShowFocusCues)
+                ControlPaint.DrawFocusRectangle(e.Graphics, Rectangle.Inflate(ClientRectangle, -4, -4), ink, fill);
         }
 
         private void ApplyColors()
         {
-            // Leave background, text, and focus painting to the standard WinForms button.
             bool primary = Enabled && !accentColor.IsEmpty;
             BackColor = primary ? accentColor : Enabled ? Color.White : FeatureTheme.Header;
-            ForeColor = primary ? Color.White : FeatureTheme.Text;
-            FlatAppearance.BorderColor = primary ? accentColor : FeatureTheme.Grid;
-            FlatAppearance.MouseOverBackColor = primary ? ControlPaint.Dark(accentColor, 0.08F) : FeatureTheme.Header;
-            FlatAppearance.MouseDownBackColor = primary ? ControlPaint.Dark(accentColor, 0.16F) : FeatureTheme.Grid;
+            ForeColor = primary ? Color.White : Enabled ? FeatureTheme.Text : FeatureTheme.Muted;
+            FlatAppearance.BorderColor = primary ? accentColor : Enabled ? FeatureTheme.ControlBorder : FeatureTheme.Grid;
+            FlatAppearance.MouseOverBackColor = primary ? ControlPaint.Dark(accentColor, 0.08F) : FeatureTheme.Hover;
+            FlatAppearance.MouseDownBackColor = primary ? ControlPaint.Dark(accentColor, 0.16F) : FeatureTheme.Selected;
+            Invalidate();
         }
     }
 
     internal sealed class CleanerForm : Form
     {
         private readonly List<Category> categories;
-        private readonly DataGridView grid = new DataGridView();
+        private readonly DataGridView grid = new FeatureGrid();
         private readonly LiquidButton scanButton = new LiquidButton();
         private readonly LiquidButton recommendedButton = new LiquidButton();
         private readonly LiquidButton clearButton = new LiquidButton();
@@ -535,7 +636,13 @@ namespace DeepCleanC
             categories = Cleaner.CreateCategories();
             DoubleBuffered = true;
             BuildUi();
+            worker.WorkerReportsProgress = true;
             worker.DoWork += WorkerDoWork;
+            worker.ProgressChanged += (sender, e) =>
+            {
+                progress.Value = e.ProgressPercentage;
+                summary.Text = (string)e.UserState;
+            };
             worker.RunWorkerCompleted += WorkerCompleted;
             Shown += OnShown;
             FormClosing += OnClosing;
@@ -575,73 +682,81 @@ namespace DeepCleanC
             };
             header.Controls.Add(title);
 
+            bool isAdmin = ToolkitApplication.IsAdministrator();
             var admin = new Label
             {
                 AutoSize = true,
                 Location = new Point(6, 44),
-                ForeColor = Program.IsAdministrator() ? FeatureTheme.Success : FeatureTheme.Warning,
+                ForeColor = isAdmin ? FeatureTheme.Success : FeatureTheme.Warning,
                 BackColor = Color.Transparent,
-                Text = Program.IsAdministrator() ? "● 已使用管理员权限" : "● 当前不是管理员，部分项目只能扫描"
+                Text = isAdmin ? "● 已使用管理员权限" : "● 当前不是管理员，部分项目只能扫描"
             };
             header.Controls.Add(admin);
 
             grid.Location = new Point(20, 82);
-            grid.Size = new Size(884, 360);
+            grid.Size = new Size(884, 378);
             grid.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
             grid.AllowUserToAddRows = false;
             grid.AllowUserToDeleteRows = false;
             grid.AllowUserToResizeRows = false;
             grid.RowHeadersVisible = false;
             grid.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
-            grid.MultiSelect = false;
             FeatureTheme.StyleGrid(grid);
             grid.MultiSelect = false;
-            grid.AutoSizeRowsMode = DataGridViewAutoSizeRowsMode.AllCells;
+            grid.RowTemplate.Height = 31;
             grid.Columns.Add(new DataGridViewCheckBoxColumn { HeaderText = "清理", Width = 50 });
+            grid.Columns[0].HeaderCell.Style.Padding = new Padding(2, 0, 2, 0);
             grid.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "项目", Width = 180, ReadOnly = true });
-            grid.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "可清理", Width = 100, ReadOnly = true });
+            grid.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "可清理", Width = 100, ReadOnly = true,
+                DefaultCellStyle = new DataGridViewCellStyle { Alignment = DataGridViewContentAlignment.MiddleRight } });
             grid.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "说明", AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill, ReadOnly = true });
             grid.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "状态", Width = 115, ReadOnly = true });
             foreach (Category category in categories)
             {
                 int index = grid.Rows.Add(category.DefaultSelected, category.Name, "未扫描", category.Description,
-                    category.RequiresAdmin && !Program.IsAdministrator() ? "需管理员权限" : "");
+                    category.RequiresAdmin && !isAdmin ? "需管理员权限" : "");
                 grid.Rows[index].Tag = category;
             }
             Controls.Add(grid);
 
-            SetupButton(scanButton, "扫描全部", new Point(20, 454), new Size(100, 34), ScanAll);
-            SetupButton(recommendedButton, "选择推荐项", new Point(128, 454), new Size(110, 34), SelectRecommended);
-            SetupButton(clearButton, "取消全选", new Point(246, 454), new Size(90, 34), ClearSelection);
-            SetupButton(cleanButton, "清理勾选项", new Point(784, 454), new Size(120, 34), CleanSelected);
+            SetupButton(scanButton, "扫描全部", new Point(20, 472), new Size(100, 34), ScanAll);
+            SetupButton(recommendedButton, "选择推荐项", new Point(128, 472), new Size(110, 34), SelectRecommended);
+            SetupButton(clearButton, "取消全选", new Point(246, 472), new Size(90, 34), ClearSelection);
+            SetupButton(cleanButton, "清理勾选项", new Point(784, 472), new Size(120, 34), CleanSelected);
             cleanButton.AccentColor = FeatureTheme.Sky;
             cleanButton.Anchor = AnchorStyles.Bottom | AnchorStyles.Right;
 
-            progress.Location = new Point(20, 498);
+            progress.Location = new Point(20, 516);
             progress.Size = new Size(884, 6);
             progress.Anchor = AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
-            progress.Style = ProgressBarStyle.Marquee;
+            progress.Style = ProgressBarStyle.Continuous;
             progress.Visible = false;
             Controls.Add(progress);
 
             summary.Text = "先扫描，再决定清理什么。不会扫描或删除桌面、下载、文档、照片。";
-            summary.Location = new Point(20, 514);
+            summary.Location = new Point(20, 532);
             summary.Size = new Size(884, 22);
             summary.Anchor = AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
             summary.ForeColor = FeatureTheme.Text;
             summary.BackColor = Color.Transparent;
             Controls.Add(summary);
 
-            log.Location = new Point(20, 540);
-            log.Size = new Size(884, 88);
-            log.Anchor = AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
+            var logFrame = new FeatureFrame
+            {
+                Location = new Point(20, 558), Size = new Size(884, 88),
+                Anchor = AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right,
+                HighlightFocus = true
+            };
+            log.Dock = DockStyle.Fill;
             log.Multiline = true;
             log.ReadOnly = true;
             log.ScrollBars = ScrollBars.Vertical;
-            log.BorderStyle = BorderStyle.FixedSingle;
+            log.BorderStyle = BorderStyle.None;
             log.BackColor = FeatureTheme.Surface;
             log.ForeColor = FeatureTheme.Text;
-            Controls.Add(log);
+            log.Text = "清理完成后，释放空间和跳过原因将显示在这里。" + Environment.NewLine;
+            logFrame.Controls.Add(log);
+            Controls.Add(logFrame);
         }
 
         private void SetupButton(Button button, string text, Point location, Size size, EventHandler handler)
@@ -729,6 +844,7 @@ namespace DeepCleanC
 
         private void StartWork(bool clean, IEnumerable<Category> selected)
         {
+            progress.Value = 0;
             SetBusy(true);
             summary.Text = clean ? "正在清理，请勿关闭窗口…" : "正在扫描，请稍候…";
             worker.RunWorkerAsync(new WorkRequest { Clean = clean, Categories = selected.ToList() });
@@ -737,11 +853,16 @@ namespace DeepCleanC
         private void WorkerDoWork(object sender, DoWorkEventArgs e)
         {
             var request = (WorkRequest)e.Argument;
-            e.Result = new object[]
+            var results = new List<CleanResult>();
+            int count = request.Categories.Count;
+            string action = request.Clean ? "清理" : "扫描";
+            foreach (Category category in request.Categories)
             {
-                request.Clean,
-                request.Categories.Select(c => request.Clean ? Cleaner.Clean(c) : Cleaner.Scan(c)).ToList()
-            };
+                worker.ReportProgress(results.Count * 100 / count,
+                    String.Format("正在{0} {1}/{2} · {3}", action, results.Count + 1, count, category.Name));
+                results.Add(request.Clean ? Cleaner.Clean(category) : Cleaner.Scan(category));
+            }
+            e.Result = new object[] { request.Clean, results };
         }
 
         private void WorkerCompleted(object sender, RunWorkerCompletedEventArgs e)
@@ -752,6 +873,7 @@ namespace DeepCleanC
                 var payload = (object[])e.Result;
                 bool cleaned = (bool)payload[0];
                 var results = (List<CleanResult>)payload[1];
+                bool isAdmin = ToolkitApplication.IsAdministrator();
                 long total = 0;
                 foreach (CleanResult result in results)
                 {
@@ -767,7 +889,7 @@ namespace DeepCleanC
                     else
                     {
                         total += result.Before;
-                        row.Cells[4].Value = "已扫描";
+                        row.Cells[4].Value = ((Category)row.Tag).RequiresAdmin && !isAdmin ? "需管理员权限" : "已扫描";
                     }
                 }
                 summary.Text = cleaned

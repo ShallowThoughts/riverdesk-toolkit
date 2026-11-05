@@ -13,7 +13,9 @@ RiverDesk Toolkit 是 RiverXILee 开发的 Windows 桌面维护工具，界面�
 
 使用 Windows .NET Framework 自带的 C# 编译器和 NSIS 3。运行 build.ps1 时可传入 -NsisCompiler 指定 makensis.exe。
 
-UpdateForm.cs 中的 VersionInfo.Number 是版本来源。发布时创建 v主版本.次版本.修订号 标签，并附上 dist/RiverDeskToolkit-Setup.exe 和 dist/update.txt。更新清单使用独立 RSA 签名，程序内置公钥并验证下载文件的 SHA-256。安装器的 Windows Authenticode 签名与更新清单签名是两件事。
+VersionInfo.cs 中的 VersionInfo.Number 是版本来源。启动程序与功能库使用同一版本。构建结果包括启动程序 dist/RiverDeskToolkit.exe、功能库 dist/RiverDesk.Toolkit.dll 和安装包 dist/RiverDeskToolkit-Setup.exe。安装器会把 EXE、DLL 和 LICENSE.txt 一起部署到安装目录。EXE 与 DLL 需要配套使用。
+
+发布时运行 build.ps1 -Sign，创建 v主版本.次版本.修订号 标签，并附上 dist/RiverDeskToolkit-Setup.exe 和 dist/update.txt。在线更新下载完整安装包，同时更新启动程序与功能库。更新清单使用独立 RSA 签名，程序内置公钥并验证安装包的 SHA-256。安装器的 Windows Authenticode 签名与更新清单签名是两件事。未指定 -Sign 的本地构建会移除旧的 dist/update.txt，避免误用与新安装包不匹配的更新清单。
 
 发布签名私钥由发布账户保存，生成更新清单时通过 -Sign 使用。换电脑或换账户前需要先安排密钥迁移。生成新密钥会让旧安装拒绝更新。
 

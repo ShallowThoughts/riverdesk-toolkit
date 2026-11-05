@@ -16,7 +16,7 @@ namespace DeepCleanC
         Update
     }
 
-    internal sealed class NavButton : Button
+    internal sealed class NavButton : LiquidButton
     {
         private readonly Bitmap normalIcon;
         private readonly Bitmap selectedIcon;
@@ -40,17 +40,18 @@ namespace DeepCleanC
 
         internal void SetSelected(bool selected)
         {
-            BackColor = selected ? Color.FromArgb(226, 235, 250) : FeatureTheme.Navigation;
-            FlatAppearance.MouseOverBackColor = selected ? BackColor : Color.FromArgb(230, 235, 243);
-            FlatAppearance.MouseDownBackColor = FeatureTheme.Grid;
+            BackColor = selected ? FeatureTheme.Selected : FeatureTheme.Navigation;
+            ForeColor = selected ? FeatureTheme.Sky : FeatureTheme.Text;
+            FlatAppearance.MouseOverBackColor = selected ? FeatureTheme.Selected : FeatureTheme.Hover;
+            FlatAppearance.MouseDownBackColor = FeatureTheme.Selected;
             Image = selected ? selectedIcon : normalIcon;
         }
 
         private static Bitmap CreateIcon(AppPage page, Color color, bool selected)
         {
             // The Windows icon family shares one em square across all four glyphs.
-            string glyph = page == AppPage.Cleanup ? "\uEDA2" : page == AppPage.Uninstaller ? "\uE773"
-                : page == AppPage.ForceDelete ? "\uE74D" : "\uE777";
+            string glyph = page == AppPage.Cleanup ? "\uE75C" : page == AppPage.Uninstaller ? "\uE71D"
+                : page == AppPage.ForceDelete ? "\uE74D" : "\uE72C";
             using (var fluent = new Font("Segoe Fluent Icons", 18, GraphicsUnit.Pixel))
             using (var legacy = new Font("Segoe MDL2 Assets", 18, GraphicsUnit.Pixel))
             {
@@ -88,9 +89,10 @@ namespace DeepCleanC
         private readonly AppPage initialPage;
         private readonly bool smokeTest;
         private readonly string[] initialPaths;
-        private readonly Panel content = new Panel();
+        private readonly Panel content = new FeatureFrame();
         private readonly Dictionary<AppPage, Form> pages = new Dictionary<AppPage, Form>();
         private readonly Dictionary<AppPage, NavButton> navButtons = new Dictionary<AppPage, NavButton>();
+        private AppPage? activePage;
         private Icon brandIcon;
         private Bitmap brandImage;
 
@@ -117,7 +119,7 @@ namespace DeepCleanC
             ClientSize = new Size(1160, 760);
             MinimumSize = new Size(1040, 680);
             Font = new Font("Segoe UI", 10F);
-            BackColor = FeatureTheme.Background;
+            BackColor = FeatureTheme.Navigation;
             AutoScaleMode = AutoScaleMode.Dpi;
 
             var sidebar = new Panel { Dock = DockStyle.Left, Width = 210, BackColor = FeatureTheme.Navigation };
@@ -129,7 +131,7 @@ namespace DeepCleanC
                 Size = new Size(34, 34),
                 BackColor = Color.Transparent,
                 Image = brandImage,
-                SizeMode = PictureBoxSizeMode.CenterImage
+                SizeMode = PictureBoxSizeMode.Zoom
             };
             sidebar.Controls.Add(brandMark);
 
@@ -158,6 +160,16 @@ namespace DeepCleanC
 
             sidebar.Controls.Add(new Label
             {
+                Text = "v" + RiverDesk.VersionInfo.Current.ToString(3),
+                Font = new Font("Segoe UI", 9F),
+                ForeColor = FeatureTheme.Muted,
+                BackColor = Color.Transparent,
+                AutoSize = true,
+                Location = new Point(24, 695),
+                Anchor = AnchorStyles.Left | AnchorStyles.Bottom
+            });
+            sidebar.Controls.Add(new Label
+            {
                 Text = "仅在本机运行",
                 Font = new Font("Microsoft YaHei UI", 9F),
                 ForeColor = FeatureTheme.Muted,
@@ -167,11 +179,18 @@ namespace DeepCleanC
                 Anchor = AnchorStyles.Left | AnchorStyles.Bottom
             });
 
+            var contentHost = new Panel
+            {
+                Dock = DockStyle.Fill,
+                Padding = new Padding(0, 12, 12, 12),
+                BackColor = FeatureTheme.Navigation
+            };
             content.Dock = DockStyle.Fill;
-            content.Padding = new Padding(8, 8, 8, 8);
+            content.Padding = new Padding(8);
             content.BackColor = FeatureTheme.Background;
-            Controls.Add(content);
-            content.BringToFront();
+            contentHost.Controls.Add(content);
+            Controls.Add(contentHost);
+            contentHost.BringToFront();
         }
 
         private void AddNavButton(Control parent, AppPage page, string text, int top, Color accent)
@@ -217,8 +236,7 @@ namespace DeepCleanC
 
         private void ShowPage(AppPage page)
         {
-            foreach (KeyValuePair<AppPage, NavButton> pair in navButtons)
-                pair.Value.SetSelected(pair.Key == page);
+            if (activePage == page) return;
 
             Form form;
             if (!pages.TryGetValue(page, out form))
@@ -236,11 +254,20 @@ namespace DeepCleanC
             }
 
             content.SuspendLayout();
-            content.Controls.Clear();
-            content.Controls.Add(form);
-            form.Show();
-            form.BringToFront();
-            content.ResumeLayout();
+            try
+            {
+                if (activePage.HasValue)
+                {
+                    pages[activePage.Value].Hide();
+                    navButtons[activePage.Value].SetSelected(false);
+                }
+                activePage = page;
+                navButtons[page].SetSelected(true);
+                if (form.Parent == null) content.Controls.Add(form);
+                form.Show();
+                form.BringToFront();
+            }
+            finally { content.ResumeLayout(); }
         }
 
         protected override void OnFormClosing(FormClosingEventArgs e)
