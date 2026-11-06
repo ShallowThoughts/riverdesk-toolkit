@@ -17,6 +17,8 @@ internal static class UiRegressionCheck
         {
             CheckClippedPainting();
             CheckLogView();
+            CheckNavigationActivation();
+            CheckUpdateNotes();
             Console.WriteLine("UI regression checks passed");
             return 0;
         }
@@ -27,10 +29,39 @@ internal static class UiRegressionCheck
         }
     }
 
+    private static void CheckNavigationActivation()
+    {
+        using (var button = new NavButton(AppPage.Update, FeatureTheme.Sky))
+        {
+            int clicks = 0;
+            button.Click += (sender, args) => clicks++;
+            var down = typeof(NavButton).GetMethod("OnKeyDown", Hidden);
+            var up = typeof(NavButton).GetMethod("OnKeyUp", Hidden);
+            down.Invoke(button, new object[] { new KeyEventArgs(Keys.Space) });
+            if (clicks != 0) throw new InvalidOperationException("Navigation activated before Space was released");
+            up.Invoke(button, new object[] { new KeyEventArgs(Keys.Space) });
+            down.Invoke(button, new object[] { new KeyEventArgs(Keys.Enter) });
+            if (clicks != 2) throw new InvalidOperationException("Navigation keyboard activation failed");
+            button.Enabled = false;
+            button.PerformClick();
+            if (clicks != 2) throw new InvalidOperationException("Disabled navigation activated");
+        }
+    }
+
+    private static void CheckUpdateNotes()
+    {
+        using (var form = new RiverDesk.UpdateForm(() => true))
+        {
+            var notes = (Control)typeof(RiverDesk.UpdateForm).GetField("notes", Hidden).GetValue(form);
+            if (notes is TextBoxBase || notes.CanSelect || notes.TabStop)
+                throw new InvalidOperationException("Update notes became a selectable text input");
+        }
+    }
+
     private static void CheckClippedPainting()
     {
-        var background = typeof(LiquidButton).GetMethod("OnPaintBackground", Hidden);
-        var paint = typeof(LiquidButton).GetMethod("OnPaint", Hidden);
+        var background = typeof(NavButton).GetMethod("OnPaintBackground", Hidden);
+        var paint = typeof(NavButton).GetMethod("OnPaint", Hidden);
         foreach (float dpi in new[] { 96F, 144F })
         foreach (AppPage page in Enum.GetValues(typeof(AppPage)))
         using (var button = new NavButton(page, FeatureTheme.Sky)

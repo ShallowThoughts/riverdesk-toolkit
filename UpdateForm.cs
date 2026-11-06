@@ -93,9 +93,9 @@ namespace RiverDesk
         private readonly LiquidButton install = new LiquidButton { Text = "下载并安装", Width = 126, Height = 38, Enabled = false };
         private readonly Label status = new Label { AutoSize = true, ForeColor = FeatureTheme.Muted };
         private readonly ProgressBar progress = new ProgressBar { Height = 12, Dock = DockStyle.Fill, Visible = false };
-        private readonly TextBox notes = new TextBox
+        private readonly LogView notes = new LogView
         {
-            Dock = DockStyle.Fill, Multiline = true, ReadOnly = true, ScrollBars = ScrollBars.Vertical,
+            Dock = DockStyle.Fill, AccessibleName = "更新说明",
             BackColor = FeatureTheme.Surface, ForeColor = FeatureTheme.Text, BorderStyle = BorderStyle.None
         };
         private UpdateRelease available;
@@ -129,7 +129,7 @@ namespace RiverDesk
             layout.Controls.Add(progress, 0, 4);
             layout.Controls.Add(new Label { Text = "更新说明", AutoSize = true, ForeColor = FeatureTheme.Text,
                 Margin = new Padding(4, 20, 0, 8) }, 0, 5);
-            var notesFrame = new FeatureFrame { Dock = DockStyle.Fill, Margin = new Padding(0), HighlightFocus = true };
+            var notesFrame = new FeatureFrame { Dock = DockStyle.Fill, Margin = new Padding(0) };
             notesFrame.Controls.Add(notes);
             layout.Controls.Add(notesFrame, 0, 6);
             notes.Text = "检查后将在这里显示最新版本的说明。";

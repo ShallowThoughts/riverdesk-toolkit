@@ -16,23 +16,25 @@ namespace DeepCleanC
         Update
     }
 
-    internal sealed class NavButton : LiquidButton
+    internal sealed class NavButton : Control
     {
         private readonly Bitmap normalIcon;
         private readonly Bitmap selectedIcon;
+        private readonly Color accent;
+        private bool selected;
+        private bool hovered;
+        private bool spacePressed;
 
         internal NavButton(AppPage page, Color accent)
         {
-            FlatStyle = FlatStyle.Flat;
-            FlatAppearance.BorderSize = 0;
-            UseVisualStyleBackColor = false;
+            this.accent = accent;
+            SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer
+                | ControlStyles.ResizeRedraw | ControlStyles.Selectable | ControlStyles.StandardClick, true);
+            TabStop = true;
+            AccessibleRole = AccessibleRole.PushButton;
             ForeColor = FeatureTheme.Text;
             Cursor = Cursors.Hand;
             Font = new Font("Microsoft YaHei UI", 10F);
-            Padding = new Padding(2, 0, 8, 0);
-            ImageAlign = ContentAlignment.MiddleLeft;
-            TextAlign = ContentAlignment.MiddleLeft;
-            TextImageRelation = TextImageRelation.ImageBeforeText;
             normalIcon = CreateIcon(page, FeatureTheme.Muted, false);
             selectedIcon = CreateIcon(page, accent, true);
             SetSelected(false);
@@ -40,11 +42,105 @@ namespace DeepCleanC
 
         internal void SetSelected(bool selected)
         {
+            this.selected = selected;
             BackColor = selected ? FeatureTheme.Selected : FeatureTheme.Navigation;
-            ForeColor = selected ? FeatureTheme.Sky : FeatureTheme.Text;
-            FlatAppearance.MouseOverBackColor = selected ? FeatureTheme.Selected : FeatureTheme.Hover;
-            FlatAppearance.MouseDownBackColor = FeatureTheme.Selected;
-            Image = selected ? selectedIcon : normalIcon;
+            ForeColor = selected ? accent : FeatureTheme.Text;
+            AccessibleDescription = selected ? "当前页面" : "打开" + Text;
+            Invalidate();
+        }
+
+        internal void PerformClick()
+        {
+            if (Enabled) OnClick(EventArgs.Empty);
+        }
+
+        protected override bool IsInputKey(Keys keyData)
+        {
+            return keyData == Keys.Space || keyData == Keys.Enter || base.IsInputKey(keyData);
+        }
+
+        protected override void OnKeyDown(KeyEventArgs e)
+        {
+            base.OnKeyDown(e);
+            if (e.KeyCode == Keys.Enter)
+            {
+                PerformClick();
+                e.Handled = true;
+            }
+            else if (e.KeyCode == Keys.Space)
+            {
+                spacePressed = true;
+                e.Handled = true;
+            }
+        }
+
+        protected override void OnKeyUp(KeyEventArgs e)
+        {
+            base.OnKeyUp(e);
+            if (e.KeyCode != Keys.Space || !spacePressed) return;
+            spacePressed = false;
+            PerformClick();
+            e.Handled = true;
+        }
+
+        protected override void OnMouseEnter(EventArgs e)
+        {
+            base.OnMouseEnter(e);
+            hovered = true;
+            Invalidate();
+        }
+
+        protected override void OnMouseLeave(EventArgs e)
+        {
+            base.OnMouseLeave(e);
+            hovered = false;
+            Invalidate();
+        }
+
+        protected override void OnGotFocus(EventArgs e)
+        {
+            base.OnGotFocus(e);
+            Invalidate();
+        }
+
+        protected override void OnLostFocus(EventArgs e)
+        {
+            base.OnLostFocus(e);
+            spacePressed = false;
+            Invalidate();
+        }
+
+        protected override void OnPaintBackground(PaintEventArgs e)
+        {
+            using (var background = new SolidBrush(Parent == null ? FeatureTheme.Navigation : Parent.BackColor))
+                e.Graphics.FillRectangle(background, e.ClipRectangle);
+        }
+
+        protected override void OnPaint(PaintEventArgs e)
+        {
+            if (Width < 2 || Height < 2) return;
+            Color fill = hovered && !selected ? FeatureTheme.Hover : BackColor;
+            Color ink = ForeColor;
+            if (SystemInformation.HighContrast)
+            {
+                fill = selected || hovered ? SystemColors.Highlight : SystemColors.Control;
+                ink = selected || hovered ? SystemColors.HighlightText : SystemColors.ControlText;
+            }
+            float scale = e.Graphics.DpiX / 96F;
+            e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
+            using (var shape = FeatureTheme.RoundedRectangle(new RectangleF(0.5F, 0.5F, Width - 1F, Height - 1F), 6F * scale))
+            using (var surface = new SolidBrush(fill))
+                e.Graphics.FillPath(surface, shape);
+            Bitmap icon = selected ? selectedIcon : normalIcon;
+            e.Graphics.DrawImage(icon, new Rectangle((int)(2 * scale), (Height - (int)(24 * scale)) / 2,
+                (int)(44 * scale), (int)(24 * scale)));
+            var textArea = new Rectangle((int)(48 * scale), 0, Math.Max(0, Width - (int)(56 * scale)), Height);
+            TextRenderer.DrawText(e.Graphics, Text, Font, textArea, ink,
+                TextFormatFlags.VerticalCenter | TextFormatFlags.SingleLine | TextFormatFlags.EndEllipsis
+                | TextFormatFlags.PreserveGraphicsClipping | TextFormatFlags.PreserveGraphicsTranslateTransform);
+            if (Focused && ShowFocusCues)
+                using (var focus = new Pen(ink) { DashStyle = DashStyle.Dot })
+                    e.Graphics.DrawRectangle(focus, Rectangle.Inflate(ClientRectangle, -4, -4));
         }
 
         private static Bitmap CreateIcon(AppPage page, Color color, bool selected)
@@ -77,7 +173,6 @@ namespace DeepCleanC
         {
             if (disposing)
             {
-                Image = null;
                 normalIcon.Dispose();
                 selectedIcon.Dispose();
             }
