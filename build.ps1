@@ -1,6 +1,7 @@
 param(
     [string]$NsisCompiler = (Join-Path $env:LOCALAPPDATA 'tauri\NSIS\makensis.exe'),
     [switch]$Sign,
+    [switch]$LiquidGlassBeta,
     [string]$SigningKey = (Join-Path $env:LOCALAPPDATA 'RiverDeskToolkit\release.dpapi'),
     [string]$Notes = 'RiverDesk Toolkit first installer release.'
 )
@@ -40,8 +41,15 @@ try {
     if (-not (Test-Path -LiteralPath $publicKeyPath)) { throw 'Update verification public key is missing.' }
 
     $source = Get-Content -Raw -LiteralPath (Join-Path $PSScriptRoot 'VersionInfo.cs')
-    $version = [regex]::Match($source, 'Number = "(\d+\.\d+\.\d+)\.0"').Groups[1].Value
+    $versionField = if ($LiquidGlassBeta) { 'BetaNumber' } else { 'StableNumber' }
+    $version = [regex]::Match($source, $versionField + ' = "(\d+\.\d+\.\d+)\.0"').Groups[1].Value
     if (-not $version) { throw 'Application version not found.' }
+    $releaseVersion = $version
+    if ($LiquidGlassBeta) {
+        $label = [regex]::Match($source, 'BetaLabel = "(beta[1-9][0-9]*)"').Groups[1].Value
+        if (-not $label) { throw 'Beta version label not found.' }
+        $releaseVersion += '-' + $label
+    }
     $app = Join-Path $dist 'RiverDeskToolkit.exe'
     $library = Join-Path $dist 'RiverDesk.Toolkit.dll'
     $icon = Join-Path $dist 'RiverDeskToolkit.ico'
@@ -50,24 +58,26 @@ try {
     if (-not (Test-Path -LiteralPath $csc)) { $csc = Join-Path $env:WINDIR 'Microsoft.NET\Framework\v4.0.30319\csc.exe' }
     $sharedSources = 'AssemblyInfo.cs', 'VersionInfo.cs' |
         ForEach-Object { Join-Path $PSScriptRoot $_ }
-    $sources = 'DeepCleanC-v1.2.0.cs', 'AppShell.cs', 'ForceDeleteFeature.cs', 'UninstallerFeature.cs', 'UpdateForm.cs' |
+    $sources = 'DeepCleanC-v1.2.0.cs', 'AppShell.cs', 'ForceDeleteFeature.cs', 'UninstallerFeature.cs', 'UpdateForm.cs', 'GlassTheme.cs' |
         ForEach-Object { Join-Path $PSScriptRoot $_ }
     $libraryArguments = '/nologo', '/warn:4', '/target:library', '/optimize+', '/platform:anycpu', '/r:System.ServiceProcess.dll',
         "/resource:$publicKeyPath,RiverDesk.UpdatePublicKey", "/out:$library"
+    if ($LiquidGlassBeta) { $libraryArguments += '/define:LIQUID_GLASS_BETA' }
     & $csc @libraryArguments @sharedSources @sources
     if ($LASTEXITCODE -ne 0) { throw 'Toolkit library compilation failed.' }
     $launcherArguments = '/nologo', '/warn:4', '/target:winexe', '/optimize+', '/platform:anycpu',
         "/r:$library", "/win32icon:$icon", "/out:$app"
+    if ($LiquidGlassBeta) { $launcherArguments += '/define:LIQUID_GLASS_BETA' }
     & $csc @launcherArguments @sharedSources (Join-Path $PSScriptRoot 'Launcher.cs')
     if ($LASTEXITCODE -ne 0) { throw 'Launcher compilation failed.' }
 
-    & $NsisCompiler /INPUTCHARSET UTF8 "/DVERSION=$version" (Join-Path $PSScriptRoot 'installer.nsi')
+    & $NsisCompiler /INPUTCHARSET UTF8 "/DVERSION=$version" "/DRELEASE_VERSION=$releaseVersion" (Join-Path $PSScriptRoot 'installer.nsi')
     if ($LASTEXITCODE -ne 0) { throw 'Installer compilation failed.' }
     $installer = Join-Path $dist 'RiverDeskToolkit-Setup.exe'
     if ($Sign) {
         $hash = (Get-FileHash -LiteralPath $installer -Algorithm SHA256).Hash.ToLowerInvariant()
         $newline = [string][char]10
-        $payload = @($version, $hash, [Convert]::ToBase64String($encoding.GetBytes($Notes))) -join $newline
+        $payload = @($releaseVersion, $hash, [Convert]::ToBase64String($encoding.GetBytes($Notes))) -join $newline
         $signature = [Convert]::ToBase64String($rsa.SignData($encoding.GetBytes($payload), [Security.Cryptography.CryptoConfig]::MapNameToOID('SHA256')))
         [IO.File]::WriteAllText((Join-Path $dist 'update.txt'), $payload + $newline + $signature + $newline, $encoding)
     } else {

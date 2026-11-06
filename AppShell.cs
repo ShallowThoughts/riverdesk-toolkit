@@ -20,14 +20,12 @@ namespace DeepCleanC
     {
         private readonly Bitmap normalIcon;
         private readonly Bitmap selectedIcon;
-        private readonly Color accent;
         private bool selected;
         private bool hovered;
         private bool spacePressed;
 
         internal NavButton(AppPage page, Color accent)
         {
-            this.accent = accent;
             SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer
                 | ControlStyles.ResizeRedraw | ControlStyles.Selectable | ControlStyles.StandardClick, true);
             TabStop = true;
@@ -36,7 +34,7 @@ namespace DeepCleanC
             Cursor = Cursors.Hand;
             Font = new Font("Microsoft YaHei UI", 10F);
             normalIcon = CreateIcon(page, FeatureTheme.Muted, false);
-            selectedIcon = CreateIcon(page, accent, true);
+            selectedIcon = CreateIcon(page, GlassTheme.Enabled ? FeatureTheme.AccentText : accent, true);
             SetSelected(false);
         }
 
@@ -44,7 +42,7 @@ namespace DeepCleanC
         {
             this.selected = selected;
             BackColor = selected ? FeatureTheme.Selected : FeatureTheme.Navigation;
-            ForeColor = selected ? accent : FeatureTheme.Text;
+            ForeColor = selected ? FeatureTheme.AccentText : FeatureTheme.Text;
             AccessibleDescription = selected ? "当前页面" : "打开" + Text;
             Invalidate();
         }
@@ -112,6 +110,7 @@ namespace DeepCleanC
 
         protected override void OnPaintBackground(PaintEventArgs e)
         {
+            if (GlassTheme.DrawControlBackground(e, this)) return;
             using (var background = new SolidBrush(Parent == null ? FeatureTheme.Navigation : Parent.BackColor))
                 e.Graphics.FillRectangle(background, e.ClipRectangle);
         }
@@ -128,9 +127,10 @@ namespace DeepCleanC
             }
             float scale = e.Graphics.DpiX / 96F;
             e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
-            using (var shape = FeatureTheme.RoundedRectangle(new RectangleF(0.5F, 0.5F, Width - 1F, Height - 1F), 6F * scale))
-            using (var surface = new SolidBrush(fill))
-                e.Graphics.FillPath(surface, shape);
+            if (!GlassTheme.DrawSurface(e.Graphics, this, Height / 2F, fill, selected ? 95 : 125))
+                using (var shape = FeatureTheme.RoundedRectangle(new RectangleF(0.5F, 0.5F, Width - 1F, Height - 1F), 6F * scale))
+                using (var surface = new SolidBrush(fill))
+                    e.Graphics.FillPath(surface, shape);
             Bitmap icon = selected ? selectedIcon : normalIcon;
             e.Graphics.DrawImage(icon, new Rectangle((int)(2 * scale), (Height - (int)(24 * scale)) / 2,
                 (int)(44 * scale), (int)(24 * scale)));
@@ -218,7 +218,7 @@ namespace DeepCleanC
             BackColor = FeatureTheme.Navigation;
             AutoScaleMode = AutoScaleMode.Dpi;
 
-            var sidebar = new Panel { Dock = DockStyle.Left, Width = 210, BackColor = FeatureTheme.Navigation };
+            var sidebar = new ScenePanel { Dock = DockStyle.Left, Width = 210, BackColor = FeatureTheme.Navigation };
             Controls.Add(sidebar);
 
             var brandMark = new PictureBox
@@ -256,7 +256,7 @@ namespace DeepCleanC
 
             sidebar.Controls.Add(new Label
             {
-                Text = "v" + RiverDesk.VersionInfo.Current.ToString(3),
+                Text = "v" + RiverDesk.VersionInfo.Display,
                 Font = new Font("Segoe UI", 9F),
                 ForeColor = FeatureTheme.Muted,
                 BackColor = Color.Transparent,
@@ -275,7 +275,7 @@ namespace DeepCleanC
                 Anchor = AnchorStyles.Left | AnchorStyles.Bottom
             });
 
-            var contentHost = new Panel
+            var contentHost = new ScenePanel
             {
                 Dock = DockStyle.Fill,
                 Padding = new Padding(0, 12, 12, 12),

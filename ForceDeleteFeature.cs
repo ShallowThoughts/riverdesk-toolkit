@@ -28,22 +28,23 @@ namespace DeepCleanC
 
     internal static class FeatureTheme
     {
-        internal static readonly Color Background = Color.White;
-        internal static readonly Color Navigation = Color.FromArgb(244, 247, 251);
-        internal static readonly Color Surface = Color.White;
-        internal static readonly Color SurfaceAlt = Color.FromArgb(248, 250, 253);
-        internal static readonly Color Header = Color.FromArgb(240, 244, 249);
-        internal static readonly Color Hover = Color.FromArgb(231, 238, 248);
-        internal static readonly Color Selected = Color.FromArgb(218, 234, 251);
-        internal static readonly Color Text = Color.FromArgb(27, 42, 64);
-        internal static readonly Color Muted = Color.FromArgb(76, 94, 119);
-        internal static readonly Color Success = Color.FromArgb(24, 116, 84);
-        internal static readonly Color Warning = Color.FromArgb(143, 88, 17);
+        internal static readonly Color Background = GlassTheme.Choose(Color.White, Color.FromArgb(12, 22, 39));
+        internal static readonly Color Navigation = GlassTheme.Choose(Color.FromArgb(244, 247, 251), Color.FromArgb(12, 23, 42));
+        internal static readonly Color Surface = GlassTheme.Choose(Color.White, Color.FromArgb(17, 31, 49));
+        internal static readonly Color SurfaceAlt = GlassTheme.Choose(Color.FromArgb(248, 250, 253), Color.FromArgb(20, 37, 57));
+        internal static readonly Color Header = GlassTheme.Choose(Color.FromArgb(240, 244, 249), Color.FromArgb(28, 49, 71));
+        internal static readonly Color Hover = GlassTheme.Choose(Color.FromArgb(231, 238, 248), Color.FromArgb(32, 65, 91));
+        internal static readonly Color Selected = GlassTheme.Choose(Color.FromArgb(218, 234, 251), Color.FromArgb(30, 72, 100));
+        internal static readonly Color Text = GlassTheme.Choose(Color.FromArgb(27, 42, 64), Color.FromArgb(228, 241, 253));
+        internal static readonly Color Muted = GlassTheme.Choose(Color.FromArgb(76, 94, 119), Color.FromArgb(164, 188, 213));
+        internal static readonly Color Success = GlassTheme.Choose(Color.FromArgb(24, 116, 84), Color.FromArgb(111, 224, 174));
+        internal static readonly Color Warning = GlassTheme.Choose(Color.FromArgb(143, 88, 17), Color.FromArgb(255, 210, 135));
         internal static readonly Color Danger = Color.FromArgb(184, 53, 73);
-        internal static readonly Color Grid = Color.FromArgb(226, 233, 242);
-        internal static readonly Color ControlBorder = Color.FromArgb(133, 150, 173);
+        internal static readonly Color Grid = GlassTheme.Choose(Color.FromArgb(226, 233, 242), Color.FromArgb(48, 73, 96));
+        internal static readonly Color ControlBorder = GlassTheme.Choose(Color.FromArgb(133, 150, 173), Color.FromArgb(110, 149, 180));
         internal static readonly Color Indigo = Color.FromArgb(87, 78, 185);
         internal static readonly Color Sky = Color.FromArgb(33, 100, 157);
+        internal static readonly Color AccentText = GlassTheme.Choose(Sky, Color.FromArgb(151, 225, 255));
 
         internal static GraphicsPath RoundedRectangle(RectangleF bounds, float radius)
         {
@@ -59,7 +60,15 @@ namespace DeepCleanC
 
         internal static void PaintBackground(Control control, PaintEventArgs e)
         {
-            e.Graphics.Clear(Background);
+            if (GlassTheme.Enabled)
+            {
+                GlassTheme.DrawBackdrop(e.Graphics, control);
+                using (var veil = new SolidBrush(Color.FromArgb(155, Background)))
+                    e.Graphics.FillRectangle(veil, e.ClipRectangle);
+            }
+            else
+                using (var background = new SolidBrush(Background))
+                    e.Graphics.FillRectangle(background, e.ClipRectangle);
         }
 
         internal static void StyleGrid(DataGridView grid)
@@ -126,9 +135,12 @@ namespace DeepCleanC
 
         protected override void OnPaintBackground(PaintEventArgs e)
         {
-            using (var background = new SolidBrush(Parent == null ? FeatureTheme.Background : Parent.BackColor))
-                e.Graphics.FillRectangle(background, e.ClipRectangle);
+            if (!GlassTheme.DrawControlBackground(e, this))
+                using (var background = new SolidBrush(Parent == null ? FeatureTheme.Background : Parent.BackColor))
+                    e.Graphics.FillRectangle(background, e.ClipRectangle);
             if (Width < 2 || Height < 2) return;
+            float radius = Height < 64 ? Height / 2F : 20F;
+            if (GlassTheme.DrawSurface(e.Graphics, this, radius, BackColor, 140)) return;
             Color border = HighlightFocus && ContainsFocus ? FeatureTheme.Sky : FeatureTheme.Grid;
             Color fill = BackColor;
             if (SystemInformation.HighContrast)

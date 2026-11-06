@@ -16,13 +16,15 @@ namespace RiverDesk
     internal sealed class UpdateRelease
     {
         internal Version Version;
+        internal string Tag;
+        internal bool IsPrerelease;
         internal string Hash;
         internal string Notes;
 
         internal static UpdateRelease Read(byte[] data, string publicKey)
         {
             string[] lines = Encoding.UTF8.GetString(data).TrimEnd('\r', '\n').Split('\n');
-            if (lines.Length != 4 || !Regex.IsMatch(lines[0], @"\A[0-9]{1,6}\.[0-9]{1,6}\.[0-9]{1,6}\z")
+            if (lines.Length != 4 || !Regex.IsMatch(lines[0], @"\A[0-9]{1,6}\.[0-9]{1,6}\.[0-9]{1,6}(?:-beta[1-9][0-9]{0,4})?\z")
                 || !Regex.IsMatch(lines[1], @"\A[0-9a-f]{64}\z"))
                 throw new InvalidDataException("更新清单格式不正确。");
             using (var rsa = new RSACryptoServiceProvider(new CspParameters(24)))
@@ -35,7 +37,9 @@ namespace RiverDesk
             }
             return new UpdateRelease
             {
-                Version = new Version(lines[0] + ".0"),
+                Version = new Version(lines[0].Split('-')[0] + ".0"),
+                Tag = "v" + lines[0],
+                IsPrerelease = lines[0].Contains("-"),
                 Hash = lines[1],
                 Notes = Encoding.UTF8.GetString(Convert.FromBase64String(lines[2]))
             };
@@ -55,7 +59,7 @@ namespace RiverDesk
         {
             ServicePointManager.SecurityProtocol |= SecurityProtocolType.Tls12;
             var request = (HttpWebRequest)WebRequest.Create(url);
-            request.UserAgent = "RiverDesk-Toolkit/" + VersionInfo.Current.ToString(3);
+            request.UserAgent = "RiverDesk-Toolkit/" + VersionInfo.Display;
             request.Timeout = 15000;
             request.ReadWriteTimeout = 15000;
             using (var response = (HttpWebResponse)request.GetResponse())
@@ -106,25 +110,26 @@ namespace RiverDesk
             this.canClose = canClose;
             Font = new Font("Microsoft YaHei UI", 10F);
             BackColor = FeatureTheme.Background;
-            var layout = new TableLayoutPanel { Dock = DockStyle.Fill, Padding = new Padding(24, 12, 24, 24), ColumnCount = 1, RowCount = 7 };
+            var layout = new TableLayoutPanel { Dock = DockStyle.Fill, Padding = new Padding(24, 12, 24, 24),
+                ColumnCount = 1, RowCount = 7, BackColor = Color.Transparent };
             for (int i = 0; i < 6; i++) layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
             layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
             layout.Controls.Add(new Label { Text = "软件更新", AutoSize = true, ForeColor = FeatureTheme.Text,
                 Font = new Font("Microsoft YaHei UI", 21F, FontStyle.Bold) }, 0, 0);
-            layout.Controls.Add(new Label { Text = VersionInfo.Name + "  ·  当前版本 " + VersionInfo.Current.ToString(3),
+            layout.Controls.Add(new Label { Text = VersionInfo.Name + "  ·  当前版本 " + VersionInfo.Display,
                 AutoSize = true, ForeColor = FeatureTheme.Muted, Margin = new Padding(4, 8, 0, 18) }, 0, 1);
-            var actions = new FlowLayoutPanel { AutoSize = true, Dock = DockStyle.Fill, WrapContents = false };
+            var actions = new FlowLayoutPanel { AutoSize = true, Dock = DockStyle.Fill, WrapContents = false, BackColor = Color.Transparent };
             check.AccentColor = FeatureTheme.Sky;
             install.AccentColor = FeatureTheme.Sky;
             actions.Controls.Add(check);
             actions.Controls.Add(install);
             var releases = new LinkLabel { Text = "GitHub 发布记录", AutoSize = true, Margin = new Padding(12, 13, 0, 0),
-                LinkColor = FeatureTheme.Sky, ActiveLinkColor = FeatureTheme.Text, VisitedLinkColor = FeatureTheme.Sky };
+                LinkColor = FeatureTheme.AccentText, ActiveLinkColor = FeatureTheme.Text, VisitedLinkColor = FeatureTheme.AccentText };
             releases.LinkClicked += (sender, args) => Process.Start(new ProcessStartInfo(VersionInfo.Releases) { UseShellExecute = true });
             actions.Controls.Add(releases);
             layout.Controls.Add(actions, 0, 2);
             status.Margin = new Padding(4, 12, 0, 10);
-            status.Text = "点击「检查更新」查询最新正式版。";
+            status.Text = VersionInfo.IsLiquidGlass ? "当前为液态玻璃测试版；检查更新将查询最新正式版。" : "点击「检查更新」查询最新正式版。";
             layout.Controls.Add(status, 0, 3);
             layout.Controls.Add(progress, 0, 4);
             layout.Controls.Add(new Label { Text = "更新说明", AutoSize = true, ForeColor = FeatureTheme.Text,
@@ -136,6 +141,11 @@ namespace RiverDesk
             Controls.Add(layout);
             check.Click += async (sender, args) => await CheckAsync();
             install.Click += async (sender, args) => await InstallAsync();
+        }
+
+        protected override void OnPaintBackground(PaintEventArgs e)
+        {
+            FeatureTheme.PaintBackground(this, e);
         }
 
         private void SetBusy(bool value)
@@ -156,12 +166,15 @@ namespace RiverDesk
             {
                 UpdateRelease latest = await Task.Run(() => UpdateRelease.Check());
                 notes.Text = latest.Notes;
-                if (latest.Version > VersionInfo.Current)
+                if (!latest.IsPrerelease && (latest.Version > VersionInfo.Current
+                    || latest.Version == VersionInfo.Current && VersionInfo.IsLiquidGlass))
                 {
                     available = latest;
                     status.Text = "发现新版本 " + latest.Version.ToString(3) + "。";
                 }
-                else status.Text = "已是最新版本。";
+                else status.Text = VersionInfo.IsLiquidGlass
+                    ? "当前为 " + VersionInfo.Display + " 测试版；最新正式版为 " + latest.Version.ToString(3) + "。"
+                    : "已是最新版本。";
             }
             catch (Exception ex)
             {
@@ -199,11 +212,10 @@ namespace RiverDesk
                     progress.Value = percent;
                     status.Text = "正在下载安装包… " + percent + "%";
                 });
-                string version = release.Version.ToString(3);
                 await Task.Run(() =>
                 {
                     using (var file = new FileStream(path, FileMode.CreateNew, FileAccess.Write, FileShare.None))
-                        UpdateRelease.Download(VersionInfo.Releases + "/download/v" + version + "/RiverDeskToolkit-Setup.exe",
+                        UpdateRelease.Download(VersionInfo.Releases + "/download/" + release.Tag + "/RiverDeskToolkit-Setup.exe",
                             file, 32 * 1024 * 1024, reporter);
                 });
                 status.Text = "正在校验安装包…";

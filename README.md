@@ -19,6 +19,10 @@ VersionInfo.cs 中的 VersionInfo.Number 是版本来源。启动程序与功能
 
 发布签名私钥由发布账户保存，生成更新清单时通过 -Sign 使用。换电脑或换账户前需要先安排密钥迁移。生成新密钥会让旧安装拒绝更新。
 
+液态玻璃测试版使用 build.ps1 -LiquidGlassBeta -Sign 构建，版本为 1.3.4-beta1，发布为 GitHub prerelease。正式版与测试版都通过安装包部署。测试版内的更新检查查询正式版。
+
+运行 test-ui.ps1 检查普通界面，运行 test-ui.ps1 -LiquidGlassBeta 检查液态玻璃界面的绘制、导航键盘操作和展示文字行为。
+
 导航图标使用 Windows 自带的 [Segoe Fluent Icons](https://learn.microsoft.com/windows/apps/design/iconography/segoe-fluent-icons-font)，兼容 Segoe MDL2 Assets。
 
 ## 许可证

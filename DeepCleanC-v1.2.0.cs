@@ -555,6 +555,7 @@ namespace DeepCleanC
 
         protected override void OnPaintBackground(PaintEventArgs e)
         {
+            if (GlassTheme.DrawControlBackground(e, this)) return;
             using (var background = new SolidBrush(Parent == null ? FeatureTheme.Background : Parent.BackColor))
                 e.Graphics.FillRectangle(background, e.ClipRectangle);
         }
@@ -575,13 +576,16 @@ namespace DeepCleanC
                 border = SystemColors.ControlText;
             }
             float scale = e.Graphics.DpiX / 96F;
-            using (var shape = FeatureTheme.RoundedRectangle(new RectangleF(0.5F, 0.5F, Width - 1F, Height - 1F), 6F * scale))
-            using (var surface = new SolidBrush(fill))
-            using (var outline = new Pen(border))
+            if (!GlassTheme.DrawSurface(e.Graphics, this, Height / 2F, fill, 170))
             {
-                e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
-                e.Graphics.FillPath(surface, shape);
-                if (FlatAppearance.BorderSize > 0) e.Graphics.DrawPath(outline, shape);
+                using (var shape = FeatureTheme.RoundedRectangle(new RectangleF(0.5F, 0.5F, Width - 1F, Height - 1F), 6F * scale))
+                using (var surface = new SolidBrush(fill))
+                using (var outline = new Pen(border))
+                {
+                    e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
+                    e.Graphics.FillPath(surface, shape);
+                    if (FlatAppearance.BorderSize > 0) e.Graphics.DrawPath(outline, shape);
+                }
             }
 
             var textArea = Rectangle.Inflate(ClientRectangle, -(int)(8 * scale), -2);
@@ -608,7 +612,7 @@ namespace DeepCleanC
         private void ApplyColors()
         {
             bool primary = Enabled && !accentColor.IsEmpty;
-            BackColor = primary ? accentColor : Enabled ? Color.White : FeatureTheme.Header;
+            BackColor = primary ? accentColor : Enabled ? FeatureTheme.Surface : FeatureTheme.Header;
             ForeColor = primary ? Color.White : Enabled ? FeatureTheme.Text : FeatureTheme.Muted;
             FlatAppearance.BorderColor = primary ? accentColor : Enabled ? FeatureTheme.ControlBorder : FeatureTheme.Grid;
             FlatAppearance.MouseOverBackColor = primary ? ControlPaint.Dark(accentColor, 0.08F) : FeatureTheme.Hover;

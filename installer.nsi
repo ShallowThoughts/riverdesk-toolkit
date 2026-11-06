@@ -1,6 +1,9 @@
 Unicode true
 !include "MUI2.nsh"
 !include "x64.nsh"
+!ifndef RELEASE_VERSION
+!define RELEASE_VERSION "${VERSION}"
+!endif
 
 Name "RiverDesk Toolkit"
 OutFile "dist\RiverDeskToolkit-Setup.exe"
@@ -11,7 +14,7 @@ VIProductVersion "${VERSION}.0"
 VIAddVersionKey /LANG=2052 "ProductName" "RiverDesk Toolkit"
 VIAddVersionKey /LANG=2052 "FileDescription" "RiverDesk Toolkit Setup"
 VIAddVersionKey /LANG=2052 "CompanyName" "RiverXILee"
-VIAddVersionKey /LANG=2052 "FileVersion" "${VERSION}"
+VIAddVersionKey /LANG=2052 "FileVersion" "${RELEASE_VERSION}"
 VIAddVersionKey /LANG=2052 "LegalCopyright" "RiverXILee"
 
 !define MUI_ABORTWARNING
@@ -70,7 +73,7 @@ Section
     CreateDirectory "$SMPROGRAMS\RiverDesk Toolkit"
     CreateShortcut "$SMPROGRAMS\RiverDesk Toolkit\RiverDesk Toolkit.lnk" "$INSTDIR\RiverDeskToolkit.exe" "" "$INSTDIR\RiverDeskToolkit.exe" 0
     WriteRegStr HKLM "${UNINSTALL_KEY}" "DisplayName" "RiverDesk Toolkit"
-    WriteRegStr HKLM "${UNINSTALL_KEY}" "DisplayVersion" "${VERSION}"
+    WriteRegStr HKLM "${UNINSTALL_KEY}" "DisplayVersion" "${RELEASE_VERSION}"
     WriteRegStr HKLM "${UNINSTALL_KEY}" "Publisher" "RiverXILee"
     WriteRegStr HKLM "${UNINSTALL_KEY}" "DisplayIcon" '"$INSTDIR\RiverDeskToolkit.exe",0'
     WriteRegStr HKLM "${UNINSTALL_KEY}" "InstallLocation" "$INSTDIR"
